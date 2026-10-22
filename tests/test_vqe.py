@@ -79,3 +79,26 @@ def test_spsa_is_reproducible_with_seed():
     a = run_vqe(op, efficient_ansatz(2), optimizer="SPSA", seed=3, maxiter=30)
     b = run_vqe(op, efficient_ansatz(2), optimizer="SPSA", seed=3, maxiter=30)
     np.testing.assert_allclose(a.params, b.params)
+
+
+def test_scan_curve_returns_one_result_per_geometry():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in (0.7, 0.9, 1.1)]
+    results = scan_curve(ops, efficient_ansatz(2), warm=True, seed=0)
+    assert len(results) == 3
+
+
+def test_warm_scan_needs_fewer_total_evaluations_than_cold():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in np.linspace(0.6, 2.0, 8)]
+    cold = scan_curve(ops, efficient_ansatz(2), warm=False, seed=0, maxiter=300)
+    warm = scan_curve(ops, efficient_ansatz(2), warm=True, seed=0, maxiter=300)
+    assert sum(r.nfev for r in warm) < sum(r.nfev for r in cold)
+
+
+def test_warm_scan_passes_previous_params_forward():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in (0.735, 0.735)]
+    first, second = scan_curve(ops, prototype_ansatz(), warm=True, seed=0)
+    # Same molecule twice: the warm-started second run begins at the optimum.
+    assert second.history[0] == pytest.approx(first.energy, abs=1e-9)
