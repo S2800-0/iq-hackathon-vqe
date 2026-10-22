@@ -58,3 +58,24 @@ def test_seed_makes_random_start_reproducible():
 def test_unknown_optimizer_raises():
     with pytest.raises(ValueError):
         run_vqe(h2(0.735).operator, prototype_ansatz(), optimizer="Adam")
+
+
+def test_spsa_converges_noiseless():
+    mol = h2(0.735)
+    result = run_vqe(mol.operator, prototype_ansatz(), optimizer="SPSA",
+                     initial_point=[0.5], seed=0, maxiter=150)
+    assert result.energy - exact_energy(mol.operator) < CHEM_ACC
+    assert result.optimizer == "SPSA"
+
+
+def test_spsa_uses_two_evaluations_per_iteration():
+    result = run_vqe(h2(0.735).operator, prototype_ansatz(), optimizer="SPSA",
+                     initial_point=[0.5], seed=0, maxiter=40)
+    assert result.nfev == 80
+
+
+def test_spsa_is_reproducible_with_seed():
+    op = h2(0.735).operator
+    a = run_vqe(op, efficient_ansatz(2), optimizer="SPSA", seed=3, maxiter=30)
+    b = run_vqe(op, efficient_ansatz(2), optimizer="SPSA", seed=3, maxiter=30)
+    np.testing.assert_allclose(a.params, b.params)
