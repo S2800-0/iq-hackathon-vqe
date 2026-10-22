@@ -8,3 +8,4 @@ packages = ["vqe_lab"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
