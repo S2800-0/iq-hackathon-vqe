@@ -17,6 +17,7 @@ code("""import numpy as np, matplotlib.pyplot as plt
 import qiskit, qiskit_nature, pyscf
 from vqe_lab.hamiltonians import h2, build_molecule, exact_energy
 from vqe_lab.vqe import prototype_ansatz, efficient_ansatz, run_vqe, energy, OPTIMIZERS
+from vqe_lab.noise import SamplingEstimator
 print("qiskit", qiskit.__version__, "| qiskit-nature", qiskit_nature.__version__, "| pyscf", pyscf.__version__)
 CHEM_ACC_MHA = 1.6
 SEEDS = [0, 1, 2]""")
@@ -47,8 +48,55 @@ ax.semilogy(bonds, [max((r.energy - e) * 1e3, 1e-7) for r, e in zip(eff, exact)]
 ax.axhline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy")
 ax.set(xlabel="H–H bond length (Å)", ylabel="error vs exact (mHa)", title="Ansatz error, noiseless")
 ax.legend(); plt.show()""")
-md("## 4. Optimizer comparison\nTODO: for 2–3 bond lengths and each optimizer: final error (mHa) and number of evaluations, over SEEDS. Add SPSA once it's implemented.")
-code("""# TODO: loop over OPTIMIZERS x [0.735, 1.5, 2.5] x SEEDS, collect error and nfev, bar chart""")
+md("""## 4. Optimizer comparison
+**4a. Noiseless.** The 1-parameter prototype is too easy to separate optimizers, so this uses the general `efficient_su2` ansatz (8 parameters) from random starting points, one per seed. Each optimizer gets `maxiter=200`. That limits iterations, not evaluations, so the evaluation counts differ. SPSA uses textbook default gains, untuned.""")
+code("""OPT_BONDS = [0.735, 1.5, 2.5]
+optimizer_results = {opt: [] for opt in OPTIMIZERS}
+for opt in OPTIMIZERS:
+    for d in OPT_BONDS:
+        m = h2(d); ex = exact_energy(m.operator)
+        for s in SEEDS:
+            r = run_vqe(m.operator, efficient_ansatz(2, reps=1), optimizer=opt, seed=s, maxiter=200)
+            optimizer_results[opt].append({"bond": d, "seed": s, "error_mha": (r.energy - ex) * 1e3, "nfev": r.nfev})
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+for opt, runs in optimizer_results.items():
+    ax1.scatter([r["nfev"] for r in runs], [max(r["error_mha"], 1e-7) for r in runs], label=opt, alpha=0.8)
+ax1.set_yscale("log"); ax1.axhline(CHEM_ACC_MHA, color="gray", ls=":")
+ax1.set(xlabel="energy evaluations", ylabel="error vs exact (mHa)", title="Accuracy vs cost (noiseless, all bonds × seeds)")
+ax1.legend(fontsize=8)
+ok = [np.mean([r["error_mha"] < CHEM_ACC_MHA for r in optimizer_results[o]]) * 100 for o in OPTIMIZERS]
+ax2.bar(OPTIMIZERS, ok)
+ax2.set(xlabel="optimizer", ylabel="runs within chemical accuracy (%)", title="Success rate", ylim=(0, 105))
+plt.tight_layout(); plt.show()
+
+for opt, runs in optimizer_results.items():
+    e = [r["error_mha"] for r in runs]; n = [r["nfev"] for r in runs]
+    print(f"{opt:12s} median error {np.median(e):9.4f} mHa   median evals {int(np.median(n)):4d}")""")
+md("""**4b. Under noise.** Full VQE optimization on the noisy, readout-mitigated simulator at 0.735 Å with the prototype ansatz. Gradient-based optimizers (SLSQP, L-BFGS-B) rely on finite differences, which shot noise wrecks, so only COBYLA and SPSA are compared here.""")
+code("""NOISY_SHOTS = 2000
+m = h2(0.735); ex = exact_energy(m.operator)
+noisy_opt_results = {}
+for opt in ["COBYLA", "SPSA"]:
+    est = SamplingEstimator(noisy=True, mitigate_readout=True, shots=NOISY_SHOTS, seed=0)
+    r = run_vqe(m.operator, prototype_ansatz(), optimizer=opt, initial_point=[0.5], estimator=est, seed=0, maxiter=40)
+    noisy_opt_results[opt] = r
+
+fig, ax = plt.subplots()
+for opt, r in noisy_opt_results.items():
+    ax.plot(np.array(r.history) - ex, label=f"{opt} ({r.nfev} evals)", alpha=0.8)
+ax.axhline(CHEM_ACC_MHA / 1e3, color="gray", ls=":", label="chemical accuracy")
+ax.set(xlabel="energy evaluation #", ylabel="measured energy − exact (Ha)",
+       title=f"Noisy VQE at 0.735 Å (FakeManilaV2 + readout mitigation, {NOISY_SHOTS} shots)")
+ax.legend(); plt.show()
+# The lowest noisy value seen is biased low (it picks the luckiest shot noise), so
+# re-measure the chosen parameters with fresh shots and the exact simulator.
+for opt, r in noisy_opt_results.items():
+    fresh = energy(m.operator, prototype_ansatz(), r.params,
+                   SamplingEstimator(noisy=True, mitigate_readout=True, shots=8000, seed=99))
+    ideal = energy(m.operator, prototype_ansatz(), r.params)
+    print(f"{opt:7s} θ = {r.params[0]:.4f}   re-measured error {(fresh - ex) * 1e3:6.2f} mHa"
+          f"   noiseless error at that θ {(ideal - ex) * 1e3:6.3f} mHa")""")
 md("## 5. Warm start along the curve\nTODO: pass each geometry's best params to the next; compare total evaluations cold vs warm, mean and range over SEEDS.")
 code("""# TODO""")
 md("""## 6. Noise and readout mitigation
@@ -58,9 +106,7 @@ Same circuit, same optimal angle, three ways of measuring it:
 - **mitigated**: noisy, plus readout-error mitigation (inverse of measured per-qubit assignment matrices)
 
 The angle is the noiseless VQE optimum, so this isolates the measurement error from the optimizer.""")
-code("""from vqe_lab.noise import SamplingEstimator
-
-NOISE_BONDS = [0.735, 1.5, 2.5]
+code("""NOISE_BONDS = [0.735, 1.5, 2.5]
 SHOTS = 8000
 settings = {"ideal": dict(noisy=False), "noisy": dict(noisy=True),
             "mitigated": dict(noisy=True, mitigate_readout=True)}
