@@ -10,7 +10,22 @@ from qiskit.primitives import StatevectorEstimator
 from qiskit.quantum_info import SparsePauliOp
 from scipy.optimize import minimize
 
-OPTIMIZERS = ("COBYLA", "SLSQP", "L-BFGS-B", "Nelder-Mead")
+OPTIMIZERS = ("COBYLA", "SLSQP", "L-BFGS-B", "Nelder-Mead", "SPSA")
+
+
+def _spsa(cost, x0, maxiter, rng, a=0.2, c=0.1, big_a=10, alpha=0.602, gamma=0.101):
+    """Simultaneous perturbation stochastic approximation (Spall's standard gains).
+
+    Two cost evaluations per iteration regardless of parameter count, and robust
+    to shot noise, which is why it is the usual choice on hardware.
+    """
+    x = np.array(x0, dtype=float)
+    for k in range(maxiter):
+        ak = a / (k + 1 + big_a) ** alpha
+        ck = c / (k + 1) ** gamma
+        delta = rng.choice([-1.0, 1.0], size=x.size)
+        grad = (cost(x + ck * delta) - cost(x - ck * delta)) / (2 * ck) * delta
+        x = x - ak * grad
 
 
 @dataclass
@@ -54,8 +69,8 @@ def run_vqe(
 ) -> VQEResult:
     if optimizer not in OPTIMIZERS:
         raise ValueError(f"optimizer must be one of {OPTIMIZERS}, got {optimizer!r}")
+    rng = np.random.default_rng(seed)
     if initial_point is None:
-        rng = np.random.default_rng(seed)
         initial_point = rng.uniform(-np.pi, np.pi, ansatz.num_parameters)
 
     history: list[float] = []
@@ -67,10 +82,13 @@ def run_vqe(
         tried.append(np.array(params))
         return value
 
-    minimize(
-        cost, np.asarray(initial_point, dtype=float), method=optimizer,
-        options={"maxiter": maxiter},
-    )
+    if optimizer == "SPSA":
+        _spsa(cost, initial_point, maxiter, rng)
+    else:
+        minimize(
+            cost, np.asarray(initial_point, dtype=float), method=optimizer,
+            options={"maxiter": maxiter},
+        )
     best = int(np.argmin(history))
     return VQEResult(
         energy=history[best],
