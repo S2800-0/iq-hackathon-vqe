@@ -88,12 +88,28 @@ def test_scan_curve_returns_one_result_per_geometry():
     assert len(results) == 3
 
 
-def test_warm_scan_needs_fewer_total_evaluations_than_cold():
+def test_warm_scan_saves_evaluations_on_prototype():
     from vqe_lab.vqe import scan_curve
-    ops = [h2(d).operator for d in np.linspace(0.6, 2.0, 8)]
-    cold = scan_curve(ops, efficient_ansatz(2), warm=False, seed=0, maxiter=300)
-    warm = scan_curve(ops, efficient_ansatz(2), warm=True, seed=0, maxiter=300)
-    assert sum(r.nfev for r in warm) < sum(r.nfev for r in cold)
+    ops = [h2(d).operator for d in np.linspace(0.5, 2.5, 11)]
+    opts = {"rhobeg": 0.05}
+    cold = scan_curve(ops, prototype_ansatz(), warm=False, initial_point=[0.0], options=opts)
+    warm = scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0], options=opts)
+    assert sum(r.nfev for r in warm) < 0.9 * sum(r.nfev for r in cold)
+    for r, op in zip(warm, ops):
+        assert r.energy - exact_energy(op) < CHEM_ACC
+
+
+def test_scan_is_deterministic():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in (0.6, 1.2, 1.8)]
+    a = scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0])
+    b = scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0])
+    assert [r.nfev for r in a] == [r.nfev for r in b]
+
+
+def test_run_vqe_passes_optimizer_options():
+    small = run_vqe(h2(0.735).operator, prototype_ansatz(), initial_point=[0.0], options={"maxiter": 5})
+    assert small.nfev <= 6
 
 
 def test_warm_scan_passes_previous_params_forward():
