@@ -66,6 +66,7 @@ def run_vqe(
     estimator=None,
     seed: int | None = None,
     maxiter: int = 200,
+    options: dict | None = None,
 ) -> VQEResult:
     if optimizer not in OPTIMIZERS:
         raise ValueError(f"optimizer must be one of {OPTIMIZERS}, got {optimizer!r}")
@@ -82,13 +83,11 @@ def run_vqe(
         tried.append(np.array(params))
         return value
 
+    opts = {"maxiter": maxiter, **(options or {})}
     if optimizer == "SPSA":
-        _spsa(cost, initial_point, maxiter, rng)
+        _spsa(cost, initial_point, opts.pop("maxiter"), rng, **opts)
     else:
-        minimize(
-            cost, np.asarray(initial_point, dtype=float), method=optimizer,
-            options={"maxiter": maxiter},
-        )
+        minimize(cost, np.asarray(initial_point, dtype=float), method=optimizer, options=opts)
     best = int(np.argmin(history))
     return VQEResult(
         energy=history[best],
@@ -97,3 +96,32 @@ def run_vqe(
         optimizer=optimizer,
         history=history,
     )
+
+
+def scan_curve(
+    operators,
+    ansatz: QuantumCircuit,
+    warm: bool = True,
+    initial_point=None,
+    optimizer: str = "COBYLA",
+    seed: int | None = None,
+    maxiter: int = 200,
+    options: dict | None = None,
+    estimator=None,
+) -> list[VQEResult]:
+    """Run VQE along a sequence of geometries.
+
+    Cold: every geometry starts from ``initial_point`` (or a seeded random point).
+    Warm: the first geometry starts the same way, each later one at the previous optimum.
+    """
+    rng = np.random.default_rng(seed)
+    results: list[VQEResult] = []
+    for op in operators:
+        start = initial_point
+        if start is None:
+            start = rng.uniform(-np.pi, np.pi, ansatz.num_parameters)
+        if warm and results:
+            start = results[-1].params
+        results.append(run_vqe(op, ansatz, optimizer=optimizer, initial_point=start,
+                               estimator=estimator, maxiter=maxiter, options=options))
+    return results

@@ -97,8 +97,29 @@ for opt, r in noisy_opt_results.items():
     ideal = energy(m.operator, prototype_ansatz(), r.params)
     print(f"{opt:7s} θ = {r.params[0]:.4f}   re-measured error {(fresh - ex) * 1e3:6.2f} mHa"
           f"   noiseless error at that θ {(ideal - ex) * 1e3:6.3f} mHa")""")
-md("## 5. Warm start along the curve\nTODO: pass each geometry's best params to the next; compare total evaluations cold vs warm, mean and range over SEEDS.")
-code("""# TODO""")
+md("""## 5. Warm start along the curve
+The prototype starts every geometry from θ = 0 (Hartree–Fock), a **cold** start. A **warm** start begins each geometry at the previous geometry's optimum, since neighbouring bond lengths have similar answers.
+
+COBYLA's default first step (1 rad) jumps away from a good start, so both runs use `rhobeg=0.05`. Finding from testing: with the default step, warm start saved only ~5%.""")
+code("""from vqe_lab.vqe import scan_curve
+
+ops = [m.operator for m in mols]
+opts = {"rhobeg": 0.05}
+warm_results = {
+    "cold": scan_curve(ops, prototype_ansatz(), warm=False, initial_point=[0.0], options=opts),
+    "warm": scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0], options=opts),
+}
+cold_n = sum(r.nfev for r in warm_results["cold"]); warm_n = sum(r.nfev for r in warm_results["warm"])
+
+fig, ax = plt.subplots()
+for name, rs in warm_results.items():
+    ax.plot(bonds, [r.nfev for r in rs], "o-", label=f"{name} (total {sum(r.nfev for r in rs)})")
+ax.set(xlabel="H–H bond length (Å)", ylabel="energy evaluations to converge",
+       title=f"Warm start: {100 * (1 - warm_n / cold_n):.0f}% fewer evaluations (prototype ansatz, COBYLA)")
+ax.legend(); plt.show()
+
+print(f"cold {cold_n} evals, warm {warm_n} evals, saved {100 * (1 - warm_n / cold_n):.1f}%")
+print("max warm error:", f"{max((r.energy - e) * 1e3 for r, e in zip(warm_results['warm'], exact)):.2e} mHa")""")
 md("""## 6. Noise and readout mitigation
 Same circuit, same optimal angle, three ways of measuring it:
 - **ideal**: real shots, no hardware noise (shot noise only)

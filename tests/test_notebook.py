@@ -45,3 +45,9 @@ def test_optimizer_section_covers_every_optimizer(ns):
 
 def test_noisy_optimizer_run_compares_cobyla_and_spsa(ns):
     assert set(ns["noisy_opt_results"]) == {"COBYLA", "SPSA"}
+
+
+def test_warm_start_section_reports_savings(ns):
+    res = ns["warm_results"]
+    assert set(res) == {"cold", "warm"}
+    assert sum(r.nfev for r in res["warm"]) < sum(r.nfev for r in res["cold"])

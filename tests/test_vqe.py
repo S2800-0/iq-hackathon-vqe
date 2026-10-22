@@ -79,3 +79,42 @@ def test_spsa_is_reproducible_with_seed():
     a = run_vqe(op, efficient_ansatz(2), optimizer="SPSA", seed=3, maxiter=30)
     b = run_vqe(op, efficient_ansatz(2), optimizer="SPSA", seed=3, maxiter=30)
     np.testing.assert_allclose(a.params, b.params)
+
+
+def test_scan_curve_returns_one_result_per_geometry():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in (0.7, 0.9, 1.1)]
+    results = scan_curve(ops, efficient_ansatz(2), warm=True, seed=0)
+    assert len(results) == 3
+
+
+def test_warm_scan_saves_evaluations_on_prototype():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in np.linspace(0.5, 2.5, 11)]
+    opts = {"rhobeg": 0.05}
+    cold = scan_curve(ops, prototype_ansatz(), warm=False, initial_point=[0.0], options=opts)
+    warm = scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0], options=opts)
+    assert sum(r.nfev for r in warm) < 0.9 * sum(r.nfev for r in cold)
+    for r, op in zip(warm, ops):
+        assert r.energy - exact_energy(op) < CHEM_ACC
+
+
+def test_scan_is_deterministic():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in (0.6, 1.2, 1.8)]
+    a = scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0])
+    b = scan_curve(ops, prototype_ansatz(), warm=True, initial_point=[0.0])
+    assert [r.nfev for r in a] == [r.nfev for r in b]
+
+
+def test_run_vqe_passes_optimizer_options():
+    small = run_vqe(h2(0.735).operator, prototype_ansatz(), initial_point=[0.0], options={"maxiter": 5})
+    assert small.nfev <= 6
+
+
+def test_warm_scan_passes_previous_params_forward():
+    from vqe_lab.vqe import scan_curve
+    ops = [h2(d).operator for d in (0.735, 0.735)]
+    first, second = scan_curve(ops, prototype_ansatz(), warm=True, seed=0)
+    # Same molecule twice: the warm-started second run begins at the optimum.
+    assert second.history[0] == pytest.approx(first.energy, abs=1e-9)
