@@ -21,3 +21,15 @@ def test_notebook_code_cells_execute():
             continue
         src = "".join(l for l in cell["source"] if not l.lstrip().startswith("%"))
         exec(compile(src, str(NB), "exec"), ns)
+
+
+def test_noise_section_shows_mitigation_helps():
+    ns = {}
+    for cell in json.loads(NB.read_text())["cells"]:
+        if cell["cell_type"] == "code":
+            src = "".join(l for l in cell["source"] if not l.lstrip().startswith("%"))
+            exec(compile(src, str(NB), "exec"), ns)
+    res = ns["noise_results"]
+    assert set(res) == {"ideal", "noisy", "mitigated"}
+    for d in res["noisy"]:
+        assert abs(res["mitigated"][d]["mean"]) < abs(res["noisy"][d]["mean"])

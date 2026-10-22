@@ -51,8 +51,45 @@ md("## 4. Optimizer comparison\nTODO: for 2–3 bond lengths and each optimizer:
 code("""# TODO: loop over OPTIMIZERS x [0.735, 1.5, 2.5] x SEEDS, collect error and nfev, bar chart""")
 md("## 5. Warm start along the curve\nTODO: pass each geometry's best params to the next; compare total evaluations cold vs warm, mean and range over SEEDS.")
 code("""# TODO""")
-md("## 6. Noise and readout mitigation\nTODO: Aer noisy estimator built from a fake IBM backend → readout mitigation. State the backend name and number of shots.")
-code("""# TODO""")
+md("""## 6. Noise and readout mitigation
+Same circuit, same optimal angle, three ways of measuring it:
+- **ideal**: real shots, no hardware noise (shot noise only)
+- **noisy**: Aer simulator built from IBM's `FakeManilaV2` calibration (gate + readout errors)
+- **mitigated**: noisy, plus readout-error mitigation (inverse of measured per-qubit assignment matrices)
+
+The angle is the noiseless VQE optimum, so this isolates the measurement error from the optimizer.""")
+code("""from vqe_lab.noise import SamplingEstimator
+
+NOISE_BONDS = [0.735, 1.5, 2.5]
+SHOTS = 8000
+settings = {"ideal": dict(noisy=False), "noisy": dict(noisy=True),
+            "mitigated": dict(noisy=True, mitigate_readout=True)}
+noise_results = {k: {} for k in settings}
+for d in NOISE_BONDS:
+    m = h2(d)
+    theta = run_vqe(m.operator, prototype_ansatz(), initial_point=[0.0]).params
+    ex = exact_energy(m.operator)
+    for name, kw in settings.items():
+        errs = [(energy(m.operator, prototype_ansatz(), theta,
+                        SamplingEstimator(shots=SHOTS, seed=s, **kw)) - ex) * 1e3 for s in SEEDS]
+        noise_results[name][d] = {"mean": float(np.mean(errs)), "min": min(errs), "max": max(errs)}
+
+x = np.arange(len(NOISE_BONDS)); w = 0.27
+fig, ax = plt.subplots()
+for i, name in enumerate(settings):
+    r = noise_results[name]
+    mean = np.array([r[d]["mean"] for d in NOISE_BONDS])
+    lo = mean - np.array([r[d]["min"] for d in NOISE_BONDS])
+    hi = np.array([r[d]["max"] for d in NOISE_BONDS]) - mean
+    ax.bar(x + (i - 1) * w, mean, w, yerr=[lo, hi], capsize=3, label=name)
+ax.axhline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy")
+ax.set_xticks(x, [f"{d} Å" for d in NOISE_BONDS])
+ax.set(xlabel="H–H bond length", ylabel="energy error vs exact (mHa)",
+       title=f"Noise and readout mitigation (FakeManilaV2, {SHOTS} shots, {len(SEEDS)} seeds)")
+ax.legend(); plt.show()
+
+for name in settings:
+    print(name.ljust(10), "  ".join(f"{d} Å: {noise_results[name][d]['mean']:6.2f} mHa" for d in NOISE_BONDS))""")
 md("## 7. Error budget\nTODO: stacked bars at one geometry: ansatz | optimizer | shots | hardware noise.")
 code("""# TODO""")
 md("## 8. (Optional) HeH⁺ and real IBM hardware")
