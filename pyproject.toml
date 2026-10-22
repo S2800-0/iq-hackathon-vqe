@@ -2,6 +2,7 @@
 name = "vqe_lab"
 version = "0.1.0"
 requires-python = ">=3.10"
+dependencies = ["numpy", "scipy", "qiskit>=2.0", "qiskit-nature>=0.7", "pyscf"]
 
 [tool.setuptools]
 packages = ["vqe_lab"]
@@ -9,3 +10,7 @@ packages = ["vqe_lab"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
