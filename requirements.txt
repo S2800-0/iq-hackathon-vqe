@@ -1,0 +1,10 @@
+numpy
+scipy
+matplotlib
+pylatexenc
+qiskit>=2.0
+qiskit-aer
+qiskit-nature>=0.7
+qiskit-ibm-runtime
+pyscf
+pytest
