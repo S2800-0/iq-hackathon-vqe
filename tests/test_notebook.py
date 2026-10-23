@@ -105,3 +105,12 @@ def test_recorded_hardware_run_is_in_notebook_and_summary(ns):
     assert rec["error_mha"] == pytest.approx((rec["energy"] - ns["exact_energy"](ns["mol"].operator)) * 1e3, abs=1e-6)
     names = {r["quantity"] for r in ns["summary"]}
     assert "Real hardware error, 0.735 Å (ibm_marrakesh, recorded)" in names
+
+
+def test_symmetry_section_helps_h2_and_flags_heh_plus(ns):
+    sym = ns["symmetry_results"]
+    for d in ns["NOISE_BONDS"]:
+        assert abs(sym[d]["mean"]) < abs(ns["noise_results"]["noisy"][d]["mean"])
+    bias = ns["heh_filter_bias_mha"]
+    assert all(b <= 1e-6 for b in bias)
+    assert min(bias) < -0.1
