@@ -157,8 +157,43 @@ ax.legend(); plt.show()
 
 for name in settings:
     print(name.ljust(10), "  ".join(f"{d} Å: {noise_results[name][d]['mean']:6.2f} mHa" for d in NOISE_BONDS))""")
-md("## 7. Error budget\nTODO: stacked bars at one geometry: ansatz | optimizer | shots | hardware noise.")
-code("""# TODO""")
+md("""## 7. Error budget at 0.735 Å
+Where does the error come from? Combines results from sections 1, 4b and 6 (see `vqe_lab/budget.py` for the definitions):
+- **ansatz**: best noiseless VQE vs exact
+- **optimizer**: how much worse the θ found by noisy COBYLA is, evaluated noiselessly
+- **shots**: finite-shot bias on a noise-free simulator
+- **gate noise**: what remains after readout mitigation
+- **readout**: what readout mitigation removes
+
+This is a first-order additive model, not an exact decomposition.""")
+code("""from vqe_lab.budget import error_budget
+
+d0 = 0.735
+m0 = h2(d0); ex0 = exact_energy(m0.operator)
+at = lambda name: ex0 + noise_results[name][d0]["mean"] / 1e3   # section 6 stores mHa errors
+budget = error_budget(
+    exact=ex0,
+    vqe_noiseless=base.energy,
+    optimizer_noiseless=energy(m0.operator, prototype_ansatz(), noisy_opt_results["COBYLA"].params),
+    ideal_shots=at("ideal"), mitigated=at("mitigated"), noisy=at("noisy"),
+)
+
+parts = ["ansatz", "optimizer", "shots", "gate_noise", "readout"]
+fig, ax = plt.subplots(figsize=(9, 3))
+for row, (label, keep) in enumerate([("raw noisy", parts), ("with readout mitigation", parts[:-1])]):
+    left = 0.0
+    for i, k in enumerate(parts):
+        width = max(budget[k], 0.0) if k in keep else 0.0
+        ax.barh(row, width, left=left, color=f"C{i}", label=k if row == 0 else None)
+        left += width
+ax.axvline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy")
+ax.set_yticks([0, 1], ["raw noisy", "with readout\\nmitigation"])
+ax.set(xlabel="energy error vs exact (mHa)", title="Error budget, H₂ at 0.735 Å (FakeManilaV2)")
+ax.legend(ncol=3, fontsize=8, loc="lower right"); plt.tight_layout(); plt.show()
+
+for k in parts + ["total_raw", "total_mitigated"]:
+    print(f"{k:16s} {budget[k]:8.2f} mHa")
+print(f"readout mitigation removes {budget['readout_recovered_pct']:.0f}% of the raw error")""")
 md("## 8. (Optional) HeH⁺ and real IBM hardware")
 code("""# TODO""")
 md("## 9. Summary table\nTODO: every number quoted in the report, printed here.")
