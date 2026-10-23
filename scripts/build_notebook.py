@@ -271,6 +271,7 @@ ax.legend(); plt.show()
 for d in NOISE_BONDS:
     print(f"{d} Å: noisy {noise_results['noisy'][d]['mean']:6.2f} → readout {noise_results['mitigated'][d]['mean']:5.2f}"
           f" → + symmetry {symmetry_results[d]['mean']:5.2f} mHa")""")
+md("""**Honest reading:** the error bars (3 seeds) overlap. In simulation the filter's effect on H₂ is **within shot noise**, and across seeds it sometimes makes the Z-term error worse. On real hardware (section 8d) the filter clearly *hurt* at short bond lengths. See the discussion there.""")
 md("""**Falsification test.** Apply the H₂ filter to the *exact* HeH⁺ ground state, using shot-free probabilities, because the effect is smaller than shot noise. A valid filter would leave the energy unchanged. An invalid one throws away real parts of the state and can push the energy **below the true ground-state energy**, which no physical state can do. That impossible result is the warning sign.""")
 code("""heh_filter_bias_mha = []
 for m in heh_mols:
