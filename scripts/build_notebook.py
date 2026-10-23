@@ -241,7 +241,7 @@ print(f"HeH⁺ at {heh_bonds[0]:.2f} Å: prototype {heh_results['proto_mha'][0]:
 md("""## 8b. (Optional) Real IBM hardware
 Runs the prototype at its noiseless optimum for H₂ at 0.735 Å on the least busy real IBM backend, using the Runtime Estimator in job mode (free plan) with `resilience_level=1` (IBM's built-in readout mitigation).
 
-To enable it, add your IBM Quantum API key as a Colab secret named `IBM_QUANTUM_TOKEN`, or set it as an environment variable. Without a key, the cell skips. **This cell has not been run by the author yet. Treat any result as unverified until it has.**""")
+To enable it, add your IBM Quantum API key as a Colab secret named `IBM_QUANTUM_TOKEN`, or set it as an environment variable. Without a key, the cell skips. The author's recorded run is stored in the cell after it, so the summary works without a key.""")
 code("""import os
 token = os.environ.get("IBM_QUANTUM_TOKEN")
 if token is None:
@@ -268,6 +268,13 @@ if token:
     print(hardware_result)
 else:
     print("No IBM_QUANTUM_TOKEN found: skipping the real-hardware run.")""")
+md("""**Recorded run (author, 2026-10-23).** Output of the cell above: H₂ at 0.735 Å with the prototype's noiseless optimum on `ibm_marrakesh` (156-qubit Heron r2), 4000 shots, `resilience_level=1`, Open plan. The job ID can be checked on the author's IBM Quantum dashboard.
+
+Real hardware error (7.0 mHa) is close to the readout-mitigated simulator from section 6 (5.9 mHa), and far below the unmitigated simulator (54.8 mHa).""")
+code("""recorded_hardware = {"backend": "ibm_marrakesh", "job_id": "dbdat51gv2cc738hoe60", "date": "2026-10-23",
+                     "shots": 4000, "resilience_level": 1, "energy": -1.85026823746133}
+recorded_hardware["error_mha"] = (recorded_hardware["energy"] - exact_energy(mol.operator)) * 1e3
+print(f"ibm_marrakesh (recorded): {recorded_hardware['energy']:.6f} Ha, error {recorded_hardware['error_mha']:.2f} mHa")""")
 md("## 9. Summary table\nEvery number quoted in the report comes from this table. The Markdown printout can be pasted straight into the report.")
 code("""best_noiseless_opt = min(OPTIMIZERS, key=lambda o: np.median([r["error_mha"] for r in optimizer_results[o]]))
 summary = [
@@ -283,6 +290,8 @@ summary = [
     {"quantity": "Mitigated error, 0.735 Å", "value": noise_results["mitigated"][0.735]["mean"], "unit": "mHa", "section": 6},
     {"quantity": "Readout share of raw error", "value": budget["readout_recovered_pct"], "unit": "%", "section": 7},
     {"quantity": "Error budget total, mitigated", "value": budget["total_mitigated"], "unit": "mHa", "section": 7},
+    {"quantity": "HeH⁺ prototype error, 0.60 Å", "value": heh_results["proto_mha"][0], "unit": "mHa", "section": "8a"},
+    {"quantity": "Real hardware error, 0.735 Å (ibm_marrakesh, recorded)", "value": recorded_hardware["error_mha"], "unit": "mHa", "section": "8b"},
 ]
 fmt = lambda v, u: f"{v:.6f}" if u == "Ha" else (f"{v:.2f}" if abs(v) >= 0.01 else f"{v:.1e}")
 summary_markdown = "| Quantity | Value | Unit | Section |\\n|---|---|---|---|\\n" + "\\n".join(
