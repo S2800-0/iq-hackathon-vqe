@@ -50,6 +50,13 @@ def _probabilities(counts, num_qubits):
     return p / p.sum()
 
 
+def postselect(p: np.ndarray, forbidden) -> np.ndarray:
+    """Zero the forbidden basis states and renormalize (symmetry verification)."""
+    p = np.array(p, dtype=float)
+    p[list(forbidden)] = 0.0
+    return p / p.sum()
+
+
 def assignment_matrices(num_qubits: int, shots: int = 8000, seed: int = 0, backend=None):
     """Per-qubit matrices A[measured, prepared], from all-0 and all-1 calibration runs."""
     backend = backend or FakeManilaV2()
@@ -72,10 +79,12 @@ class SamplingEstimator:
     """Estimator-like object usable with ``vqe_lab.vqe.energy`` and ``run_vqe``."""
 
     def __init__(self, noisy: bool = True, shots: int = 4000, seed: int | None = None,
-                 mitigate_readout: bool = False, backend=None):
+                 mitigate_readout: bool = False, backend=None, forbidden_states=None):
         if mitigate_readout and not noisy:
             raise ValueError("readout mitigation only makes sense with noisy=True")
         self.noisy, self.shots, self.mitigate = noisy, shots, mitigate_readout
+        # Basis states the exact ground state never occupies; dropped from all-Z measurements.
+        self.forbidden = list(forbidden_states or [])
         self.backend = backend or FakeManilaV2()
         self.sim = _simulator(noisy, self.backend)
         self._seed = seed
@@ -109,12 +118,14 @@ class SamplingEstimator:
                     qc.h(q)
             qc.measure_all()
             circuits.append(qc)
-            terms.append((mask, coeff.real))
+            terms.append((mask, coeff.real, not pauli.x.any()))
         counts = _run_counts(circuits, self.sim, self.shots, self._next_seed(), list(range(n)))
-        for (mask, coeff), c in zip(terms, counts):
+        for (mask, coeff, z_only), c in zip(terms, counts):
             p = _probabilities(c, n)
             if self.mitigate:
                 p = self._readout_inverse(n) @ p
+            if self.forbidden and z_only:
+                p = postselect(p, self.forbidden)
             signs = np.array([1 - 2 * (bin(i & mask).count("1") % 2) for i in range(2**n)])
             total += coeff * float(signs @ p)
         return total
