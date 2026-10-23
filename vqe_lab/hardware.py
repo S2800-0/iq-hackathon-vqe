@@ -64,7 +64,7 @@ def _readout_inverse(c0, c1, n=2):
     return np.linalg.inv(reduce(np.kron, mats[::-1]))
 
 
-def _energy(op, probs_by_basis, inverse=None, forbidden=None):
+def _energy(op, probs_by_basis, inverse=None, forbidden=None, clip=False):
     n = op.num_qubits
     total = 0.0
     for pauli, coeff in zip(op.paulis, op.coeffs):
@@ -75,6 +75,10 @@ def _energy(op, probs_by_basis, inverse=None, forbidden=None):
         p = probs_by_basis[_basis_label(pauli)]
         if inverse is not None:
             p = inverse @ p
+        if clip:
+            # Readout inversion can leave small negative "probabilities"; project them away first.
+            p = np.clip(p, 0.0, None)
+            p = p / p.sum()
         if forbidden and not pauli.x.any():
             p = postselect(p, forbidden)
         signs = np.array([1 - 2 * (bin(i & mask).count("1") % 2) for i in range(2**n)])
@@ -97,6 +101,9 @@ def analyze_curve(plan: dict, counts: list[dict]) -> dict:
             "raw": _energy(e["operator"], probs[d]),
             "readout": _energy(e["operator"], probs[d], inverse),
             "symmetry": _energy(e["operator"], probs[d], inverse, e["forbidden"]),
+            "symmetry_clipped": _energy(e["operator"], probs[d], inverse, e["forbidden"], clip=True),
+            # Sum of negative entries in the readout-corrected Z-basis distribution.
+            "negative_mass": float(np.minimum(inverse @ probs[d]["ZZ"], 0.0).sum()),
         }
     return out
 
@@ -113,4 +120,4 @@ def run_curve(sampler, backend, bonds, shots: int = 4000, seed: int = 0) -> dict
     result = job.result()
     counts = [r.data.meas.get_counts() for r in result]
     return {"job_id": job.job_id(), "physical_qubits": physical, "shots": shots,
-            "energies": analyze_curve(plan, counts)}
+            "index": plan["index"], "counts": counts, "energies": analyze_curve(plan, counts)}

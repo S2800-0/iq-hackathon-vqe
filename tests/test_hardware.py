@@ -40,3 +40,35 @@ def test_run_curve_on_fake_backend_mitigation_helps():
         ex = exact_energy(h2(d).operator)
         assert abs(out["energies"][d]["readout"] - ex) < abs(out["energies"][d]["raw"] - ex)
     assert len(out["physical_qubits"]) == 2
+
+
+def test_perfect_counts_have_no_negative_mass_and_clipped_matches_exact():
+    plan = build_curve(BONDS)
+    result = analyze_curve(plan, [_ideal_counts(c) for c in plan["circuits"]])
+    for d in BONDS:
+        assert result[d]["negative_mass"] == pytest.approx(0.0, abs=1e-9)
+        assert result[d]["symmetry_clipped"] == pytest.approx(exact_energy(h2(d).operator), abs=1e-5)
+
+
+def test_overcorrected_readout_shows_negative_mass():
+    plan = build_curve([0.735])
+    counts = [_ideal_counts(c) for c in plan["circuits"]]
+    # Calibration claims 10% readout error on both qubits, but the data had none:
+    # the inverse then over-corrects and pushes |00>/|11> negative.
+    for i, key in enumerate(plan["index"]):
+        if key[0] == "cal":
+            ok = "00" if key[1] == 0 else "11"
+            flips = ["01", "10"]
+            counts[i] = {ok: 810_000, flips[0]: 90_000, flips[1]: 90_000, ("11" if ok == "00" else "00"): 10_000}
+    r = analyze_curve(plan, counts)[0.735]
+    assert r["negative_mass"] < -1e-3
+
+
+def test_run_curve_returns_raw_counts_for_later_analysis():
+    from qiskit_ibm_runtime import SamplerV2
+    from qiskit_ibm_runtime.fake_provider import FakeManilaV2
+
+    backend = FakeManilaV2()
+    out = run_curve(SamplerV2(mode=backend), backend, [0.735], shots=2000, seed=0)
+    assert len(out["counts"]) == len(out["index"]) == 4
+    assert all(sum(c.values()) == 2000 for c in out["counts"])
