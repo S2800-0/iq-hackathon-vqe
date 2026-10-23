@@ -213,8 +213,61 @@ ax.legend(ncol=3, fontsize=8, loc="lower right"); plt.tight_layout(); plt.show()
 for k in parts + ["total_raw", "total_mitigated"]:
     print(f"{k:16s} {budget[k]:8.2f} mHa")
 print(f"readout mitigation removes {budget['readout_recovered_pct']:.0f}% of the raw error")""")
-md("## 8. (Optional) HeH⁺ and real IBM hardware")
-code("""# TODO""")
+md("""## 8. HeH⁺: where the prototype ansatz falls short
+HeH⁺ is also 2 electrons in 2 orbitals (2 qubits), but He and H are different atoms, so the molecule has no mirror symmetry. Single excitations are no longer forbidden and mix into the ground state. The 1-parameter prototype can't produce them, so it should miss a little. The general ansatz can.""")
+code("""heh_bonds = np.linspace(0.6, 3.0, 9)
+heh_mols = [build_molecule(f"He 0 0 0; H 0 0 {d}", charge=1) for d in heh_bonds]
+heh_results = {"bonds": heh_bonds, "proto_mha": [], "eff_mha": [], "outside_weight": []}
+for m in heh_mols:
+    ex = exact_energy(m.operator)
+    p = run_vqe(m.operator, prototype_ansatz(), initial_point=[0.0], options={"rhobeg": 0.5})
+    e = run_vqe(m.operator, efficient_ansatz(2, reps=2), seed=0, maxiter=800)
+    heh_results["proto_mha"].append((p.energy - ex) * 1e3)
+    heh_results["eff_mha"].append((e.energy - ex) * 1e3)
+    w = ground_state_weights(m.operator)
+    heh_results["outside_weight"].append(w[0] + w[3])
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+ax1.semilogy(heh_bonds, np.maximum(heh_results["proto_mha"], 1e-7), "o-", label="prototype (1 param)")
+ax1.semilogy(heh_bonds, np.maximum(heh_results["eff_mha"], 1e-7), "s-", label="efficient_su2 (reps=2)")
+ax1.axhline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy")
+ax1.set(xlabel="He–H bond length (Å)", ylabel="error vs exact (mHa)", title="HeH⁺ ansatz error, noiseless")
+ax1.legend()
+ax2.semilogy(heh_bonds, np.maximum(heh_results["outside_weight"], 1e-12), "o-", color="C2")
+ax2.set(xlabel="He–H bond length (Å)", ylabel="ground-state weight on |00⟩ + |11⟩",
+        title="Weight the prototype cannot reach")
+plt.tight_layout(); plt.show()
+print(f"HeH⁺ at {heh_bonds[0]:.2f} Å: prototype {heh_results['proto_mha'][0]:.3f} mHa, general {heh_results['eff_mha'][0]:.1e} mHa")""")
+md("""## 8b. (Optional) Real IBM hardware
+Runs the prototype at its noiseless optimum for H₂ at 0.735 Å on the least busy real IBM backend, using the Runtime Estimator in job mode (free plan) with `resilience_level=1` (IBM's built-in readout mitigation).
+
+To enable it, add your IBM Quantum API key as a Colab secret named `IBM_QUANTUM_TOKEN`, or set it as an environment variable. Without a key, the cell skips. **This cell has not been run by the author yet. Treat any result as unverified until it has.**""")
+code("""import os
+token = os.environ.get("IBM_QUANTUM_TOKEN")
+if token is None:
+    try:
+        from google.colab import userdata
+        token = userdata.get("IBM_QUANTUM_TOKEN")
+    except Exception:
+        token = None
+
+hardware_result = None
+if token:
+    from qiskit import transpile
+    from qiskit_ibm_runtime import QiskitRuntimeService, EstimatorV2 as RuntimeEstimator
+    service = QiskitRuntimeService(channel="ibm_quantum_platform", token=token)
+    backend = service.least_busy(operational=True, simulator=False)
+    circ = transpile(prototype_ansatz().assign_parameters(base.params), backend, optimization_level=1)
+    obs = mol.operator.apply_layout(circ.layout)
+    est = RuntimeEstimator(mode=backend, options={"resilience_level": 1, "default_shots": 4000})
+    job = est.run([(circ, obs)])
+    print("job id:", job.job_id(), "on", backend.name, "(waiting in queue...)")
+    hw = float(job.result()[0].data.evs)
+    hardware_result = {"backend": backend.name, "job_id": job.job_id(), "energy": hw,
+                       "error_mha": (hw - exact_energy(mol.operator)) * 1e3}
+    print(hardware_result)
+else:
+    print("No IBM_QUANTUM_TOKEN found: skipping the real-hardware run.")""")
 md("## 9. Summary table\nEvery number quoted in the report comes from this table. The Markdown printout can be pasted straight into the report.")
 code("""best_noiseless_opt = min(OPTIMIZERS, key=lambda o: np.median([r["error_mha"] for r in optimizer_results[o]]))
 summary = [
