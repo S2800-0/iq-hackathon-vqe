@@ -57,3 +57,17 @@ def test_error_budget_section(ns):
     b = ns["budget"]
     assert b["readout"] > 0
     assert b["total_mitigated"] < b["total_raw"]
+
+
+def test_summary_table_lists_headline_numbers(ns):
+    import math
+    rows = ns["summary"]
+    names = {r["quantity"] for r in rows}
+    for needed in ["Baseline VQE energy, H₂ 0.735 Å", "Warm start evaluations saved",
+                   "Raw noisy error, 0.735 Å", "Mitigated error, 0.735 Å",
+                   "Readout share of raw error"]:
+        assert needed in names
+    for r in rows:
+        assert {"quantity", "value", "unit", "section"} <= set(r)
+        assert math.isfinite(r["value"])
+    assert ns["summary_markdown"].startswith("| Quantity |")

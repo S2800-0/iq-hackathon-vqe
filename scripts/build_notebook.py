@@ -100,7 +100,9 @@ for opt, r in noisy_opt_results.items():
 md("""## 5. Warm start along the curve
 The prototype starts every geometry from θ = 0 (Hartree–Fock), a **cold** start. A **warm** start begins each geometry at the previous geometry's optimum, since neighbouring bond lengths have similar answers.
 
-COBYLA's default first step (1 rad) jumps away from a good start, so both runs use `rhobeg=0.05`. Finding from testing: with the default step, warm start saved only ~5%.""")
+COBYLA's default first step (1 rad) jumps away from a good start, so both runs use `rhobeg=0.05`. Finding from testing: with the default step, warm start saved only ~5%.
+
+Reproducibility note: across repeated runs the saving varies between about 22% and 23%. One geometry occasionally takes 2 more evaluations, most likely from tiny floating-point differences in the PySCF Hamiltonian coefficients that shift where COBYLA stops. Report it as ~22%.""")
 code("""from vqe_lab.vqe import scan_curve
 
 ops = [m.operator for m in mols]
@@ -196,7 +198,26 @@ for k in parts + ["total_raw", "total_mitigated"]:
 print(f"readout mitigation removes {budget['readout_recovered_pct']:.0f}% of the raw error")""")
 md("## 8. (Optional) HeH⁺ and real IBM hardware")
 code("""# TODO""")
-md("## 9. Summary table\nTODO: every number quoted in the report, printed here.")
+md("## 9. Summary table\nEvery number quoted in the report comes from this table. The Markdown printout can be pasted straight into the report.")
+code("""best_noiseless_opt = min(OPTIMIZERS, key=lambda o: np.median([r["error_mha"] for r in optimizer_results[o]]))
+summary = [
+    {"quantity": "Baseline VQE energy, H₂ 0.735 Å", "value": base.energy, "unit": "Ha", "section": 1},
+    {"quantity": "Exact energy, H₂ 0.735 Å", "value": exact_energy(h2(0.735).operator), "unit": "Ha", "section": 1},
+    {"quantity": "Prototype max error, 0.5–2.5 Å (noiseless)",
+     "value": max((r.energy - e) * 1e3 for r, e in zip(proto, exact)), "unit": "mHa", "section": 3},
+    {"quantity": f"Best noiseless optimizer median error ({best_noiseless_opt})",
+     "value": float(np.median([r["error_mha"] for r in optimizer_results[best_noiseless_opt]])), "unit": "mHa", "section": "4a"},
+    {"quantity": "Noisy COBYLA: noiseless error at found θ", "value": budget["optimizer"], "unit": "mHa", "section": "4b"},
+    {"quantity": "Warm start evaluations saved", "value": 100 * (1 - warm_n / cold_n), "unit": "%", "section": 5},
+    {"quantity": "Raw noisy error, 0.735 Å", "value": noise_results["noisy"][0.735]["mean"], "unit": "mHa", "section": 6},
+    {"quantity": "Mitigated error, 0.735 Å", "value": noise_results["mitigated"][0.735]["mean"], "unit": "mHa", "section": 6},
+    {"quantity": "Readout share of raw error", "value": budget["readout_recovered_pct"], "unit": "%", "section": 7},
+    {"quantity": "Error budget total, mitigated", "value": budget["total_mitigated"], "unit": "mHa", "section": 7},
+]
+fmt = lambda v, u: f"{v:.6f}" if u == "Ha" else (f"{v:.2f}" if abs(v) >= 0.01 else f"{v:.1e}")
+summary_markdown = "| Quantity | Value | Unit | Section |\\n|---|---|---|---|\\n" + "\\n".join(
+    f"| {r['quantity']} | {fmt(r['value'], r['unit'])} | {r['unit']} | {r['section']} |" for r in summary)
+print(summary_markdown)""")
 
 nb = {"nbformat": 4, "nbformat_minor": 5,
       "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3"}, "language_info": {"name": "python"}},
