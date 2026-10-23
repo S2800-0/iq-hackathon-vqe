@@ -51,3 +51,9 @@ def test_warm_start_section_reports_savings(ns):
     res = ns["warm_results"]
     assert set(res) == {"cold", "warm"}
     assert sum(r.nfev for r in res["warm"]) < sum(r.nfev for r in res["cold"])
+
+
+def test_error_budget_section(ns):
+    b = ns["budget"]
+    assert b["readout"] > 0
+    assert b["total_mitigated"] < b["total_raw"]
