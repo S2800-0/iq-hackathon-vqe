@@ -10,9 +10,9 @@ md("""# Diagnosing the VQE Prototype: H₂ under stretching, optimizers and nois
 **IQ Hackathon 2026 · VQE track · Rising Star**
 
 Question: where does the provided VQE prototype lose accuracy, and how much does each fix recover?""")
-md("## 0. Setup\nInstalls every package needed (submission rule). The `vqe_lab` helpers install from this project's GitHub repo, which has to be public for this cell to work in Colab.")
+md("## 0. Setup\nInstalls every package needed (submission rule). The `vqe_lab` helpers install from this project's GitHub repo, which has to be public for this cell to work in Colab. `--force-reinstall` makes a reused Colab session pick up the latest helpers.")
 code(f"""%pip install -q numpy scipy matplotlib pylatexenc "qiskit>=2.0" qiskit-aer "qiskit-nature>=0.7" qiskit-ibm-runtime pyscf
-%pip install -q git+{REPO}""")
+%pip install -q --force-reinstall --no-deps git+{REPO}""")
 code("""import numpy as np, matplotlib.pyplot as plt
 import qiskit, qiskit_nature, pyscf
 from vqe_lab.hamiltonians import h2, build_molecule, exact_energy

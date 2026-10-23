@@ -90,3 +90,9 @@ def test_section8_hardware_cell_skips_without_token(ns):
     import os
     if not os.environ.get("IBM_QUANTUM_TOKEN"):
         assert ns["hardware_result"] is None
+
+
+def test_install_cell_always_refreshes_vqe_lab():
+    cells = [c for c in json.loads(NB.read_text())["cells"] if c["cell_type"] == "code"]
+    line = next(l for l in cells[0]["source"] if "git+" in l)
+    assert "--force-reinstall" in line and "--no-deps" in line
