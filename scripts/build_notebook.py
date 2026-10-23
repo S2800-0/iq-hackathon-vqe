@@ -102,7 +102,7 @@ The prototype starts every geometry from θ = 0 (Hartree–Fock), a **cold** sta
 
 COBYLA's default first step (1 rad) jumps away from a good start, so both runs use `rhobeg=0.05`. Finding from testing: with the default step, warm start saved only ~5%.
 
-Reproducibility note: across repeated runs the saving varies between about 22% and 23%. One geometry occasionally takes 2 more evaluations, most likely from tiny floating-point differences in the PySCF Hamiltonian coefficients that shift where COBYLA stops. Report it as ~22%.""")
+Reproducibility note: across repeated runs (local and Colab) the saving varies between about 21% and 23%. One geometry occasionally takes 2 more evaluations, most likely from tiny floating-point differences in the PySCF Hamiltonian coefficients that shift where COBYLA stops. Report it as about 21–23%.""")
 code("""from vqe_lab.vqe import scan_curve
 
 ops = [m.operator for m in mols]
