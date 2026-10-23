@@ -71,3 +71,9 @@ def test_summary_table_lists_headline_numbers(ns):
         assert {"quantity", "value", "unit", "section"} <= set(r)
         assert math.isfinite(r["value"])
     assert ns["summary_markdown"].startswith("| Quantity |")
+
+
+def test_section3_shows_h2_ground_state_support(ns):
+    w = ns["h2_ground_weights"]
+    assert len(w) == len(ns["bonds"])
+    assert all(row[0] + row[3] < 1e-10 for row in w)

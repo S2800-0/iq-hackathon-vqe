@@ -51,3 +51,9 @@ def h2(bond_length: float) -> Molecule:
 def exact_energy(operator: SparsePauliOp) -> float:
     """Lowest eigenvalue by dense diagonalization (fine for a few qubits)."""
     return float(np.linalg.eigvalsh(operator.to_matrix()).min())
+
+
+def ground_state_weights(operator: SparsePauliOp) -> np.ndarray:
+    """Probability of each computational basis state in the exact ground state."""
+    _, vecs = np.linalg.eigh(operator.to_matrix())
+    return np.abs(vecs[:, 0]) ** 2
