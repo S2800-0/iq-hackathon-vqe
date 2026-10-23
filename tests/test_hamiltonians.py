@@ -42,3 +42,17 @@ def test_heh_plus_builds_with_charge():
     mol = build_molecule("He 0 0 0; H 0 0 0.772", charge=1)
     assert mol.operator.num_qubits == 2
     assert mol.hf_energy > exact_energy(mol.operator)
+
+
+def test_h2_ground_state_lives_on_two_basis_states():
+    from vqe_lab.hamiltonians import ground_state_weights
+    for d in (0.5, 1.5, 3.0):
+        w = ground_state_weights(h2(d).operator)
+        assert w[0] + w[3] < 1e-10
+        assert w.sum() == pytest.approx(1.0)
+
+
+def test_heh_plus_ground_state_uses_all_four_basis_states():
+    from vqe_lab.hamiltonians import ground_state_weights
+    w = ground_state_weights(build_molecule("He 0 0 0; H 0 0 0.772", charge=1).operator)
+    assert w[0] + w[3] > 1e-4
