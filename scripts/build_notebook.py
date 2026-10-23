@@ -322,6 +322,50 @@ code("""recorded_hardware = {"backend": "ibm_marrakesh", "job_id": "dbdat51gv2cc
                      "shots": 4000, "resilience_level": 1, "energy": -1.85026823746133}
 recorded_hardware["error_mha"] = (recorded_hardware["energy"] - exact_energy(mol.operator)) * 1e3
 print(f"ibm_marrakesh (recorded): {recorded_hardware['energy']:.6f} Ha, error {recorded_hardware['error_mha']:.2f} mHa")""")
+md("""## 8d. H₂ dissociation curve on real hardware (one batched job)
+Eight bond lengths in a **single** Sampler job: two measurement bases per bond (Z for IZ/ZI/ZZ, X for XX) at the prototype's noiseless optimum, plus two readout-calibration circuits on the same two physical qubits. That's 18 circuits × 4000 shots.
+
+From the raw counts, the analysis computes three curves: **raw**, **readout-mitigated** (our own calibration, not IBM's built-in setting) and **readout + symmetry filter** (section 8b).
+
+First a **rehearsal** of the identical job on the fake backend (local, free), then the real run if `IBM_QUANTUM_TOKEN` is set (same key as 8c). Estimated QPU use: well under a minute for 18 small circuits, but this is unverified, so check usage on the IBM dashboard afterwards.""")
+code("""from vqe_lab.hardware import run_curve
+from qiskit_ibm_runtime import SamplerV2
+from qiskit_ibm_runtime.fake_provider import FakeManilaV2
+
+CURVE_BONDS = [0.5, 0.735, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5]
+CURVE_SHOTS = 4000
+
+def plot_curve(out, title):
+    E = out["energies"]; ds = sorted(E)
+    nuc_of = {d: h2(d).nuclear_repulsion for d in ds}
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(11, 4))
+    fine = np.linspace(min(ds), max(ds), 40)
+    ax1.plot(fine, [exact_energy(h2(d).operator) + h2(d).nuclear_repulsion for d in fine], "k-", label="exact")
+    for mode, mk in [("raw", "x"), ("readout", "s"), ("symmetry", "o")]:
+        ax1.plot(ds, [E[d][mode] + nuc_of[d] for d in ds], mk, label=mode)
+        ax2.plot(ds, [(E[d][mode] - E[d]["exact"]) * 1e3 for d in ds], mk + "-", label=mode)
+    ax2.axhline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy"); ax2.axhline(0, color="k", lw=0.6)
+    ax1.set(xlabel="H–H bond length (Å)", ylabel="total energy (Ha)", title=title)
+    ax2.set(xlabel="H–H bond length (Å)", ylabel="error vs exact (mHa)", title="Error by mitigation level")
+    ax1.legend(); ax2.legend(fontsize=8); plt.tight_layout(); plt.show()
+    for d in ds:
+        print(f"{d:5.3f} Å  raw {(E[d]['raw'] - E[d]['exact']) * 1e3:7.2f}  readout {(E[d]['readout'] - E[d]['exact']) * 1e3:6.2f}"
+              f"  +symmetry {(E[d]['symmetry'] - E[d]['exact']) * 1e3:6.2f} mHa")
+
+fake_backend = FakeManilaV2()
+fake_curve = run_curve(SamplerV2(mode=fake_backend), fake_backend, CURVE_BONDS, shots=CURVE_SHOTS, seed=0)
+plot_curve(fake_curve, "Rehearsal: H₂ curve on FakeManilaV2 (simulated)")""")
+code("""hardware_curve = None
+if token:
+    backend = service.least_busy(operational=True, simulator=False)
+    print("submitting 18 circuits to", backend.name, "...")
+    hardware_curve = run_curve(SamplerV2(mode=backend), backend, CURVE_BONDS, shots=CURVE_SHOTS, seed=0)
+    hardware_curve["backend"] = backend.name
+    print("job id:", hardware_curve["job_id"], "| physical qubits:", hardware_curve["physical_qubits"])
+    plot_curve(hardware_curve, f"H₂ curve on {backend.name} (real hardware)")
+    print({d: {k: float(v) for k, v in e.items()} for d, e in hardware_curve["energies"].items()})
+else:
+    print("No IBM_QUANTUM_TOKEN found: skipping the real-hardware curve.")""")
 md("## 9. Summary table\nEvery number quoted in the report comes from this table. The Markdown printout can be pasted straight into the report.")
 code("""best_noiseless_opt = min(OPTIMIZERS, key=lambda o: np.median([r["error_mha"] for r in optimizer_results[o]]))
 summary = [

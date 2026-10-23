@@ -114,3 +114,13 @@ def test_symmetry_section_helps_h2_and_flags_heh_plus(ns):
     bias = ns["heh_filter_bias_mha"]
     assert all(b <= 1e-6 for b in bias)
     assert min(bias) < -0.1
+
+
+def test_hardware_curve_section_rehearses_on_fake_backend(ns):
+    import os
+    rehearsal = ns["fake_curve"]["energies"]
+    assert len(rehearsal) == len(ns["CURVE_BONDS"]) >= 6
+    for e in rehearsal.values():
+        assert abs(e["readout"] - e["exact"]) < abs(e["raw"] - e["exact"])
+    if not os.environ.get("IBM_QUANTUM_TOKEN"):
+        assert ns["hardware_curve"] is None
