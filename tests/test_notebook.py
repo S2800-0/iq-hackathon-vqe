@@ -96,3 +96,12 @@ def test_install_cell_always_refreshes_vqe_lab():
     cells = [c for c in json.loads(NB.read_text())["cells"] if c["cell_type"] == "code"]
     line = next(l for l in cells[0]["source"] if "git+" in l)
     assert "--force-reinstall" in line and "--no-deps" in line
+
+
+def test_recorded_hardware_run_is_in_notebook_and_summary(ns):
+    rec = ns["recorded_hardware"]
+    assert rec["backend"] == "ibm_marrakesh"
+    assert rec["job_id"] and rec["date"]
+    assert rec["error_mha"] == pytest.approx((rec["energy"] - ns["exact_energy"](ns["mol"].operator)) * 1e3, abs=1e-6)
+    names = {r["quantity"] for r in ns["summary"]}
+    assert "Real hardware error, 0.735 Å (ibm_marrakesh, recorded)" in names
