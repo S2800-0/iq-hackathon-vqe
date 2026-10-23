@@ -38,7 +38,24 @@ ax.plot(bonds, exact + nuc, "k-", label="exact")
 ax.plot(bonds, hf + nuc, "--", label="Hartree–Fock")
 ax.set(xlabel="H–H bond length (Å)", ylabel="total energy (Ha)", title="H₂ dissociation curve")
 ax.legend(); plt.show()""")
-md("## 3. Ansatz comparison (noiseless)\nFinding from testing: on 2-qubit H₂ the 1-parameter prototype is already exact at every bond length. Without noise, the ansatz isn't what limits accuracy here. TODO: write up why (symmetry: one parameter spans the whole relevant subspace).")
+md("""## 3. Ansatz comparison (noiseless)
+**Finding:** on 2-qubit H₂ the 1-parameter prototype is exact at every bond length. Without noise, the ansatz isn't what limits accuracy.
+
+**Why:** after parity mapping, H₂ has 4 basis states: |00⟩, |01⟩, |10⟩, |11⟩. Two of them are the Hartree–Fock state (both electrons in the bonding orbital) and the doubly excited state (both in the antibonding orbital). The other two are single excitations. Those have the wrong symmetry: H₂ is mirror-symmetric, and a single excitation flips that symmetry, so the Hamiltonian never mixes them into the ground state. The ground state is therefore always cos(θ/2)·|HF⟩ + sin(θ/2)·|doubly excited⟩, exactly the family the prototype circuit prepares. One angle is enough. The cell below checks this numerically.""")
+code("""from vqe_lab.hamiltonians import ground_state_weights
+
+h2_ground_weights = [ground_state_weights(m.operator) for m in mols]
+labels = ["|00⟩", "|01⟩", "|10⟩", "|11⟩"]
+fig, ax = plt.subplots()
+bottom = np.zeros(len(bonds))
+for k in range(4):
+    vals = np.array([w[k] for w in h2_ground_weights])
+    ax.bar(bonds, vals, width=0.15, bottom=bottom, label=labels[k]); bottom += vals
+ax.set(xlabel="H–H bond length (Å)", ylabel="weight in exact ground state",
+       title="H₂ ground state uses only two basis states")
+ax.legend(); plt.show()
+print("max weight outside the prototype's two states:", f"{max(w[0] + w[3] for w in h2_ground_weights):.1e}")""")
+md("The general `efficient_su2` circuit can reach all 4 states, but its optimizer has 12 parameters to tune. Its error grows as the bond stretches (still under chemical accuracy), while the 1-parameter circuit stays exact. For this molecule, the circuit built from the chemistry beats the generic one.")
 code("""proto = [run_vqe(m.operator, prototype_ansatz(), initial_point=[0.0]) for m in mols]
 eff = [run_vqe(m.operator, efficient_ansatz(2, reps=2), seed=0, maxiter=500) for m in mols]
 
