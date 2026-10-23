@@ -238,7 +238,54 @@ ax2.set(xlabel="He–H bond length (Å)", ylabel="ground-state weight on |00⟩ 
         title="Weight the prototype cannot reach")
 plt.tight_layout(); plt.show()
 print(f"HeH⁺ at {heh_bonds[0]:.2f} Å: prototype {heh_results['proto_mha'][0]:.3f} mHa, general {heh_results['eff_mha'][0]:.1e} mHa")""")
-md("""## 8b. (Optional) Real IBM hardware
+md("""## 8b. Symmetry as an error filter
+Section 3 found that H₂'s exact ground state **never** occupies |00⟩ or |11⟩. So any Z-basis shot that lands there must be an error, and it can be thrown away. This is **symmetry verification** (Bonet-Monroig et al., 2018; Sagastizabal et al., 2019). The filter applies to the Z-basis terms (IZ, ZI, ZZ). The XX term is measured in another basis and stays unfiltered.
+
+The same reasoning predicts that the filter is **invalid for HeH⁺**, which section 8 showed does occupy |00⟩ and |11⟩.""")
+code("""from vqe_lab.symmetry import forbidden_states, exact_filtered_energy
+
+H2_FORBIDDEN = forbidden_states(h2(0.735).operator)
+print("H₂ forbidden basis states:", [labels[i] for i in H2_FORBIDDEN],
+      "| HeH⁺ forbidden:", [labels[i] for i in forbidden_states(heh_mols[0].operator)] or "none")
+
+symmetry_results = {}
+for d in NOISE_BONDS:
+    m = h2(d); ex = exact_energy(m.operator)
+    theta = run_vqe(m.operator, prototype_ansatz(), initial_point=[0.0]).params
+    errs = [(energy(m.operator, prototype_ansatz(), theta,
+                    SamplingEstimator(noisy=True, mitigate_readout=True, forbidden_states=H2_FORBIDDEN,
+                                      shots=SHOTS, seed=s)) - ex) * 1e3 for s in SEEDS]
+    symmetry_results[d] = {"mean": float(np.mean(errs)), "min": min(errs), "max": max(errs)}
+
+x = np.arange(len(NOISE_BONDS)); w = 0.38
+fig, ax = plt.subplots()
+for i, (name, r) in enumerate([("readout mitigation", noise_results["mitigated"]), ("+ symmetry filter", symmetry_results)]):
+    mean = np.array([r[d]["mean"] for d in NOISE_BONDS])
+    err = [mean - np.array([r[d]["min"] for d in NOISE_BONDS]), np.array([r[d]["max"] for d in NOISE_BONDS]) - mean]
+    ax.bar(x + (i - 0.5) * w, mean, w, yerr=err, capsize=3, label=name, color=f"C{i + 2}")
+ax.axhline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy")
+ax.set_xticks(x, [f"{d} Å" for d in NOISE_BONDS])
+ax.set(xlabel="H–H bond length", ylabel="energy error vs exact (mHa)",
+       title=f"Symmetry filter on top of readout mitigation (FakeManilaV2, {SHOTS} shots)")
+ax.legend(); plt.show()
+for d in NOISE_BONDS:
+    print(f"{d} Å: noisy {noise_results['noisy'][d]['mean']:6.2f} → readout {noise_results['mitigated'][d]['mean']:5.2f}"
+          f" → + symmetry {symmetry_results[d]['mean']:5.2f} mHa")""")
+md("""**Falsification test.** Apply the H₂ filter to the *exact* HeH⁺ ground state, using shot-free probabilities, because the effect is smaller than shot noise. A valid filter would leave the energy unchanged. An invalid one throws away real parts of the state and can push the energy **below the true ground-state energy**, which no physical state can do. That impossible result is the warning sign.""")
+code("""heh_filter_bias_mha = []
+for m in heh_mols:
+    r = run_vqe(m.operator, efficient_ansatz(2, reps=2), seed=0, maxiter=800)
+    circ = efficient_ansatz(2, reps=2).assign_parameters(r.params)
+    heh_filter_bias_mha.append((exact_filtered_energy(m.operator, circ, H2_FORBIDDEN) - exact_energy(m.operator)) * 1e3)
+
+fig, ax = plt.subplots()
+ax.plot(heh_bonds, heh_filter_bias_mha, "o-", color="C3")
+ax.axhline(0, color="k", lw=0.8)
+ax.set(xlabel="He–H bond length (Å)", ylabel="filtered energy − exact ground energy (mHa)",
+       title="H₂'s filter applied to HeH⁺ goes below the true minimum")
+plt.show()
+print(f"most negative: {min(heh_filter_bias_mha):.3f} mHa (impossible for a valid state)")""")
+md("""## 8c. (Optional) Real IBM hardware
 Runs the prototype at its noiseless optimum for H₂ at 0.735 Å on the least busy real IBM backend, using the Runtime Estimator in job mode (free plan) with `resilience_level=1` (IBM's built-in readout mitigation).
 
 To enable it, add your IBM Quantum API key as a Colab secret named `IBM_QUANTUM_TOKEN`, or set it as an environment variable. Without a key, the cell skips. The author's recorded run is stored in the cell after it, so the summary works without a key.""")
@@ -290,8 +337,10 @@ summary = [
     {"quantity": "Mitigated error, 0.735 Å", "value": noise_results["mitigated"][0.735]["mean"], "unit": "mHa", "section": 6},
     {"quantity": "Readout share of raw error", "value": budget["readout_recovered_pct"], "unit": "%", "section": 7},
     {"quantity": "Error budget total, mitigated", "value": budget["total_mitigated"], "unit": "mHa", "section": 7},
+    {"quantity": "Readout + symmetry filter error, 0.735 Å", "value": symmetry_results[0.735]["mean"], "unit": "mHa", "section": "8b"},
+    {"quantity": "H₂ filter on HeH⁺: most negative bias (invalid filter)", "value": min(heh_filter_bias_mha), "unit": "mHa", "section": "8b"},
     {"quantity": "HeH⁺ prototype error, 0.60 Å", "value": heh_results["proto_mha"][0], "unit": "mHa", "section": "8a"},
-    {"quantity": "Real hardware error, 0.735 Å (ibm_marrakesh, recorded)", "value": recorded_hardware["error_mha"], "unit": "mHa", "section": "8b"},
+    {"quantity": "Real hardware error, 0.735 Å (ibm_marrakesh, recorded)", "value": recorded_hardware["error_mha"], "unit": "mHa", "section": "8c"},
 ]
 fmt = lambda v, u: f"{v:.6f}" if u == "Ha" else (f"{v:.2f}" if abs(v) >= 0.01 else f"{v:.1e}")
 summary_markdown = "| Quantity | Value | Unit | Section |\\n|---|---|---|---|\\n" + "\\n".join(
