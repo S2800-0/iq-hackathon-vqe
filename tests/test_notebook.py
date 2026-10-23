@@ -77,3 +77,16 @@ def test_section3_shows_h2_ground_state_support(ns):
     w = ns["h2_ground_weights"]
     assert len(w) == len(ns["bonds"])
     assert all(row[0] + row[3] < 1e-10 for row in w)
+
+
+def test_section8_heh_plus_shows_prototype_limit(ns):
+    r = ns["heh_results"]
+    assert len(r["proto_mha"]) == len(r["bonds"]) == len(r["eff_mha"])
+    # Near equilibrium the prototype misses states it cannot reach; the general ansatz does not.
+    assert r["proto_mha"][0] > 10 * max(r["eff_mha"][0], 1e-6)
+
+
+def test_section8_hardware_cell_skips_without_token(ns):
+    import os
+    if not os.environ.get("IBM_QUANTUM_TOKEN"):
+        assert ns["hardware_result"] is None
