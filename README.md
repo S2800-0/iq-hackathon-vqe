@@ -8,6 +8,7 @@ Starting from the provided H₂ VQE notebook, this project measures where its en
 - `vqe_lab/` reusable helpers (Hamiltonians, VQE runner), covered by tests
 - `tests/` pytest suite
 - `notebooks/` submission notebook
+- `report.md` project report (figures in `figures/`, hardware runs in `results/`)
 - `docs/` spec and report outline
 
 ## Run tests
