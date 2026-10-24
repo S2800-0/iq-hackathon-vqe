@@ -23,7 +23,7 @@
 - Cut optimizer evaluations by **about 21–23%** by warm-starting each bond length from the previous one.
 - Simulated a real IBM chip's noise: errors grow to **55 mHa**, and readout-error mitigation brings them back to **5.9 mHa**. An error budget shows **readout causes ~86%** of the raw error.
 - Tried **symmetry verification**, a published error filter that follows from the same symmetry, and showed it is **invalid for HeH⁺**: it gives an energy below the true minimum, which the variational principle forbids.
-- Ran on **real IBM quantum hardware** (Open plan): **7.0 mHa** on ibm_marrakesh at 0.735 Å, plus full 8-point dissociation curves. Found that **qubit choice matters**: a bad qubit on ibm_kingston gave errors 10× larger. Fixed the code to choose qubits by calibration.
+- Ran on **real IBM quantum hardware** (Open plan): **7.0 mHa** on ibm_marrakesh at 0.735 Å, plus full 8-point dissociation curves. Found that **qubit choice matters**: on ibm_kingston, qubits [0, 1] gave raw errors up to 486 mHa. After fixing the code to pick qubits by calibration, the same chip gave **1.8–20.6 mHa**.
 - Built it as a tested Python package (`vqe_lab`, 70+ tests), developed in small reviewed pull requests, and ran the notebook top to bottom in Colab.
 
 ## 2. Motivation
@@ -125,18 +125,20 @@ The same reasoning says the filter is **invalid for HeH⁺**. Applying it to HeH
 |---|---|---|---|
 | single point, 0.735 Å, IBM readout mitigation | ibm_marrakesh | dbdat51gv2cc738hoe60 | **7.01 mHa** |
 | same, repeated | ibm_fez | dbdkfnk24mrc739ih5kg | 25.21 mHa |
-| 8-point curve, qubits [0, 1] | ibm_marrakesh | not captured | readout-mitigated 1–17 mHa (4 points within chemical accuracy) |
-| 8-point curve, qubits [0, 1] | ibm_kingston | dbe0bonsstms73fb8lfg | 37–375 mHa (failed, see below) |
+| 8-point curve, qubits [0, 1] | ibm_marrakesh | not captured | readout-mitigated 0.9–17 mHa in size (2 points within chemical accuracy) |
+| 8-point curve, qubits [0, 1] | ibm_kingston | dbe0bonsstms73fb8lfg | readout-mitigated 36–375 mHa (failed, see below) |
+| single point, default qubits | ibm_fez | dbe0rtfpc3tc739kteq0 | 18.64 mHa |
+| **8-point curve, best pair [148, 149]** | **ibm_kingston** | **dbe0scfgdj9s73fl0cm0** | **raw 1.8–20.6, readout-mitigated −2.3–12.3 mHa** |
 
 ![Hardware curves](figures/08d_hardware_curves.png)
 
 - **The noise model holds up:** real hardware gave 7.0 mHa against 5.9 mHa predicted by the mitigated simulator.
 - **My own readout mitigation works on real hardware:** on ibm_marrakesh, raw errors of 18–56 mHa dropped to 1–17 mHa.
-- **Results vary a lot between chips:** the same job gave 7.0 mHa on ibm_marrakesh and 25.2 mHa on ibm_fez.
+- **Results vary a lot between chips and qubits:** the same single-point job gave 7.0 mHa on ibm_marrakesh, and 25.2 and 18.6 mHa on ibm_fez.
 - **The symmetry filter hurt on hardware** at short bond lengths (e.g. 4.6 → 14.4 mHa at 1.0 Å). That is far beyond shot noise, so it is a real effect.
-- **Diagnosing the failure:** both curve runs landed on physical qubits [0, 1], because my code let the transpiler choose them. On ibm_kingston the readout calibration was far off (negative probability mass ≈ −0.7, against ≈ −0.005 in simulation), and IBM's calibration snapshot lists Kingston's qubit 1 at 16.8% readout error (median 0.95%). I fixed the code to choose the qubit pair with the lowest gate and readout error. Whether bad qubits also explain the filter result on ibm_marrakesh is untested, since that run's raw counts were not saved. The code now saves them.
-
-_TODO if the best-qubit rerun finishes: add its job ID and results here._
+- **Diagnosing the failure:** both curve runs landed on physical qubits [0, 1], because my code let the transpiler choose them. On ibm_kingston the readout calibration was far off (negative probability mass ≈ −0.7, against ≈ −0.005 in simulation), and IBM's calibration snapshot lists Kingston's qubit 1 at 16.8% readout error (median 0.95%). I fixed the code to choose the qubit pair with the lowest gate and readout error.
+- **The fix works:** rerun on ibm_kingston's best pair [148, 149], raw errors fell from 180–486 mHa to **1.8–20.6 mHa**, 15–116× smaller on the same chip, depending on bond length. With readout mitigation, 3 of 8 bond lengths are within chemical accuracy (|error| < 1.6 mHa).
+- **On good qubits the symmetry filter helped at short bond lengths** (12.3 → 7.7 mHa at 0.5 Å, 5.0 → 2.6 mHa at 0.735 Å) and was roughly neutral elsewhere. That fits the idea that its earlier failure came from bad qubits, but one run is not proof.
 
 ## 5. What improved over the prototype
 
@@ -146,13 +148,13 @@ _TODO if the best-qubit rerun finishes: add its job ID and results here._
 | When does it fail? | unknown | **predicted and confirmed** (HeH⁺) |
 | Cost of a full curve | cold start each point | **~21–23% fewer evaluations** (warm start) |
 | On a noisy device | untested | 54.8 → 5.9 mHa with readout mitigation. Error budget identifies readout as ~86% |
-| On real hardware | untested | **7.0 mHa** on ibm_marrakesh, full curves, and a qubit-selection bug found and fixed |
+| On real hardware | untested | **7.0 mHa** on ibm_marrakesh. Full curves. Choosing qubits by calibration cut raw errors 15–116× on ibm_kingston |
 
 ## 6. Limitations and honest negatives
 
 - **No quantum advantage is claimed.** These molecules are tiny, and the exact answer is computed classically in milliseconds. The point is understanding how the algorithm and the hardware behave.
 - The HeH⁺ effect is real but small (below chemical accuracy).
-- The symmetry filter's benefit in simulation is within shot noise, and on hardware it hurt. Its hardware failure is not fully explained.
+- The symmetry filter's benefit in simulation is within shot noise. On hardware it hurt on bad qubits and helped at short bond lengths on good ones. That comes from one run each, so it is not settled.
 - SPSA was untuned. The error budget is approximate. The warm-start saving varies by about ±1%.
 - Hardware results depend strongly on the chip and the qubits used on the day.
 

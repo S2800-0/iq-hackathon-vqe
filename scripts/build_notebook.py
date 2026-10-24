@@ -371,6 +371,20 @@ if token:
     print({d: {k: float(v) for k, v in e.items()} for d, e in hardware_curve["energies"].items()})
 else:
     print("No IBM_QUANTUM_TOKEN found: skipping the real-hardware curve.")""")
+md("""**Recorded runs (author).** Two curves before the qubit-selection fix ran on qubits [0, 1]. On ibm_kingston that gave 180–486 mHa raw errors. After the fix, the same chip on its best pair [148, 149] gave the curve below. Every run is in `results/hardware_runs.json`.""")
+code("""recorded_curve = {"backend": "ibm_kingston", "job_id": "dbe0scfgdj9s73fl0cm0", "date": "2026-10-24",
+                  "physical_qubits": [148, 149], "shots": 4000,
+                  "bonds": [0.5, 0.735, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5],
+                  "raw": [20.55, 10.97, 5.73, 1.79, 11.62, 3.76, 2.67, 5.59],
+                  "readout": [12.29, 5.03, 1.20, -2.31, 7.78, -0.43, -1.91, 0.54],
+                  "symmetry": [7.73, 2.56, -0.37, -3.09, 7.15, -0.69, -2.19, 0.49]}
+fig, ax = plt.subplots()
+for mode, mk in [("raw", "x-"), ("readout", "s-"), ("symmetry", "o-")]:
+    ax.plot(recorded_curve["bonds"], recorded_curve[mode], mk, label=mode)
+ax.axhline(CHEM_ACC_MHA, color="gray", ls=":", label="chemical accuracy"); ax.axhline(0, color="k", lw=0.6)
+ax.set(xlabel="H–H bond length (Å)", ylabel="error vs exact (mHa)",
+       title="Recorded: ibm_kingston, best qubit pair [148, 149] (real hardware)")
+ax.legend(); plt.show()""")
 md("## 9. Summary table\nEvery number quoted in the report comes from this table. The Markdown printout can be pasted straight into the report.")
 code("""best_noiseless_opt = min(OPTIMIZERS, key=lambda o: np.median([r["error_mha"] for r in optimizer_results[o]]))
 summary = [
@@ -389,6 +403,8 @@ summary = [
     {"quantity": "Readout + symmetry filter error, 0.735 Å", "value": symmetry_results[0.735]["mean"], "unit": "mHa", "section": "8b"},
     {"quantity": "H₂ filter on HeH⁺: most negative bias (invalid filter)", "value": min(heh_filter_bias_mha), "unit": "mHa", "section": "8b"},
     {"quantity": "HeH⁺ prototype error, 0.60 Å", "value": heh_results["proto_mha"][0], "unit": "mHa", "section": "8a"},
+    {"quantity": "Real hardware curve, max |readout error| (ibm_kingston best pair, recorded)",
+     "value": max(abs(v) for v in recorded_curve["readout"]), "unit": "mHa", "section": "8d"},
     {"quantity": "Real hardware error, 0.735 Å (ibm_marrakesh, recorded)", "value": recorded_hardware["error_mha"], "unit": "mHa", "section": "8c"},
 ]
 fmt = lambda v, u: f"{v:.6f}" if u == "Ha" else (f"{v:.2f}" if abs(v) >= 0.01 else f"{v:.1e}")
