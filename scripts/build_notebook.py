@@ -287,7 +287,7 @@ ax.set(xlabel="He–H bond length (Å)", ylabel="filtered energy − exact groun
 plt.show()
 print(f"most negative: {min(heh_filter_bias_mha):.3f} mHa (impossible for a valid state)")""")
 md("""## 8c. (Optional) Real IBM hardware
-Runs the prototype at its noiseless optimum for H₂ at 0.735 Å on the least busy real IBM backend, using the Runtime Estimator in job mode (free plan) with `resilience_level=1` (IBM's built-in readout mitigation).
+Runs the prototype at its noiseless optimum for H₂ at 0.735 Å on the least busy real IBM backend, on the best qubit pair from live calibration (see 8d), using the Runtime Estimator in job mode (free plan) with `resilience_level=1` (IBM's built-in readout mitigation).
 
 To enable it, add your IBM Quantum API key as a Colab secret named `IBM_QUANTUM_TOKEN`, or set it as an environment variable. Without a key, the cell skips. The author's recorded run is stored in the cell after it, so the summary works without a key.""")
 code("""import os
@@ -305,7 +305,9 @@ if token:
     from qiskit_ibm_runtime import QiskitRuntimeService, EstimatorV2 as RuntimeEstimator
     service = QiskitRuntimeService(channel="ibm_quantum_platform", token=token)
     backend = service.least_busy(operational=True, simulator=False)
-    circ = transpile(prototype_ansatz().assign_parameters(base.params), backend, optimization_level=1)
+    from vqe_lab.hardware import best_qubit_pair
+    circ = transpile(prototype_ansatz().assign_parameters(base.params), backend,
+                     initial_layout=best_qubit_pair(backend), optimization_level=1)
     obs = mol.operator.apply_layout(circ.layout)
     est = RuntimeEstimator(mode=backend, options={"resilience_level": 1, "default_shots": 4000})
     job = est.run([(circ, obs)])

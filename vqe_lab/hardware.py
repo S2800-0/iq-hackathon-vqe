@@ -129,10 +129,15 @@ def best_qubit_pair(backend) -> list[int]:
 
 
 def local_sampler(backend, seed: int = 0):
-    """Sampler for the fake-backend rehearsal, with the simulator seeded so reruns match."""
-    from qiskit_ibm_runtime import SamplerV2
+    """Seeded Aer sampler with the fake backend's noise, for a rehearsal that reruns identically.
 
-    return SamplerV2(mode=backend, options={"simulator": {"seed_simulator": seed}})
+    The runtime's local mode (``SamplerV2(mode=fake_backend)``) did not honour a simulator
+    seed across processes, so this uses Aer's own sampler, which takes the seed directly.
+    """
+    from qiskit_aer.noise import NoiseModel
+    from qiskit_aer.primitives import SamplerV2
+
+    return SamplerV2(seed=seed, options={"backend_options": {"noise_model": NoiseModel.from_backend(backend)}})
 
 
 def run_curve(sampler, backend, bonds, shots: int = 4000, seed: int = 0, physical=None) -> dict:

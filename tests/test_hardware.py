@@ -108,3 +108,20 @@ def test_seeded_local_rehearsal_is_reproducible():
     a = run_curve(local_sampler(backend, seed=3), backend, [0.735], shots=2000, seed=3)
     b = run_curve(local_sampler(backend, seed=3), backend, [0.735], shots=2000, seed=3)
     assert a["counts"] == b["counts"]
+
+
+def test_seeded_rehearsal_is_reproducible_across_processes():
+    import subprocess
+    import sys
+
+    code = (
+        "from qiskit_ibm_runtime.fake_provider import FakeManilaV2\n"
+        "from vqe_lab.hardware import run_curve, local_sampler\n"
+        "b = FakeManilaV2()\n"
+        "print(sorted(run_curve(local_sampler(b, seed=0), b, [0.735], shots=2000, seed=0)['counts'][0].items()))\n"
+    )
+    root = str(__import__("pathlib").Path(__file__).resolve().parents[1])
+    outs = [subprocess.run([sys.executable, "-W", "ignore", "-c", code], capture_output=True, text=True,
+                           cwd=root, env={**__import__("os").environ, "PYTHONPATH": root}, check=True).stdout
+            for _ in range(2)]
+    assert outs[0] == outs[1] and outs[0]
