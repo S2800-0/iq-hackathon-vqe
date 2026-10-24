@@ -1,0 +1,24 @@
+{
+  "note": "Recorded real-hardware runs by the author. Errors are energy minus exact (electronic), in mHa. Copied from the Colab output of sections 8c and 8d.",
+  "single_point": [
+    {"backend": "ibm_marrakesh", "job_id": "dbdat51gv2cc738hoe60", "date": "2026-10-23", "bond": 0.735,
+     "shots": 4000, "mitigation": "IBM resilience_level=1", "error_mha": 7.01},
+    {"backend": "ibm_fez", "job_id": "dbdkfnk24mrc739ih5kg", "date": "2026-10-23", "bond": 0.735,
+     "shots": 4000, "mitigation": "IBM resilience_level=1", "error_mha": 25.21}
+  ],
+  "curves": [
+    {"backend": "ibm_marrakesh", "job_id": null, "job_id_note": "not captured as text; check the IBM dashboard",
+     "date": "2026-10-23", "physical_qubits": [0, 1], "qubit_choice": "transpiler default (before fix)", "shots": 4000,
+     "bonds": [0.5, 0.735, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5],
+     "raw":      [56.39, 49.53, 29.61, 27.87, 17.62, 20.10, 24.72, 25.30],
+     "readout":  [10.14, 17.09, 4.59, 6.35, -4.03, -1.97, 1.36, -0.87],
+     "symmetry": [32.96, 24.45, 14.40, 11.33, -0.99, -0.49, 1.78, -0.79]},
+    {"backend": "ibm_kingston", "job_id": "dbe0bonsstms73fb8lfg", "date": "2026-10-24",
+     "physical_qubits": [0, 1], "qubit_choice": "transpiler default (before fix)", "shots": 4000,
+     "bonds": [0.5, 0.735, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5],
+     "raw":      [486.28, 332.10, 260.27, 207.76, 179.78, 180.05, 201.60, 232.81],
+     "readout":  [374.84, 230.42, 225.98, 146.12, 37.17, 36.21, 51.97, 60.64],
+     "symmetry": [696.44, 448.75, 347.11, 223.83, 93.33, 66.36, 64.05, 63.45],
+     "negative_mass": [-0.715, -0.714, -0.727, -0.763, -0.680, -0.684, -0.733, -0.754]}
+  ]
+}
