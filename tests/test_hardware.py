@@ -72,3 +72,39 @@ def test_run_curve_returns_raw_counts_for_later_analysis():
     out = run_curve(SamplerV2(mode=backend), backend, [0.735], shots=2000, seed=0)
     assert len(out["counts"]) == len(out["index"]) == 4
     assert all(sum(c.values()) == 2000 for c in out["counts"])
+
+
+def _pair_score(backend, pair):
+    t = backend.target
+    g2 = next(g for g in ("cz", "ecr", "cx") if g in t.operation_names)
+    gate = t[g2].get(tuple(pair)) or t[g2].get(tuple(pair[::-1]))
+    return gate.error + t["measure"][(pair[0],)].error + t["measure"][(pair[1],)].error
+
+
+def test_best_qubit_pair_beats_qubits_0_1_on_kingston():
+    from qiskit_ibm_runtime.fake_provider import FakeKingston
+    from vqe_lab.hardware import best_qubit_pair
+
+    backend = FakeKingston()
+    pair = best_qubit_pair(backend)
+    assert _pair_score(backend, pair) < _pair_score(backend, [0, 1]) / 5
+
+
+def test_run_curve_uses_best_pair_by_default():
+    from qiskit_ibm_runtime import SamplerV2
+    from qiskit_ibm_runtime.fake_provider import FakeManilaV2
+    from vqe_lab.hardware import best_qubit_pair
+
+    backend = FakeManilaV2()
+    out = run_curve(SamplerV2(mode=backend), backend, [0.735], shots=1000, seed=0)
+    assert sorted(out["physical_qubits"]) == sorted(best_qubit_pair(backend))
+
+
+def test_seeded_local_rehearsal_is_reproducible():
+    from qiskit_ibm_runtime.fake_provider import FakeManilaV2
+    from vqe_lab.hardware import local_sampler
+
+    backend = FakeManilaV2()
+    a = run_curve(local_sampler(backend, seed=3), backend, [0.735], shots=2000, seed=3)
+    b = run_curve(local_sampler(backend, seed=3), backend, [0.735], shots=2000, seed=3)
+    assert a["counts"] == b["counts"]
