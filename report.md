@@ -4,11 +4,11 @@
 
 | | |
 |---|---|
-| **Group name** | _TODO_ |
+| **Group name** | bitteam |
 | **Member** | Shahesta _TODO last name_ |
-| **Affiliation** | _TODO university / organization_ |
-| **Department** | _TODO_ |
-| **Career level** | _TODO (e.g. undergraduate, graduate, professional)_ |
+| **Affiliation** | Al Ryada University |
+| **Department** | Computer Science and Artificial Intelligence |
+| **Career level** | Undergraduate student |
 | **Submission category** | Rising Star |
 | **Code** | [`notebooks/vqe_study.ipynb`](notebooks/vqe_study.ipynb) ([open in Colab](https://colab.research.google.com/github/S2800-0/iq-hackathon-vqe/blob/main/notebooks/vqe_study.ipynb)) |
 
