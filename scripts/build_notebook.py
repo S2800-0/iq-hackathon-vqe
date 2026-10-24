@@ -328,8 +328,10 @@ Eight bond lengths in a **single** Sampler job: two measurement bases per bond (
 
 From the raw counts, the analysis computes three curves: **raw**, **readout-mitigated** (our own calibration, not IBM's built-in setting) and **readout + symmetry filter** (section 8b).
 
-First a **rehearsal** of the identical job on the fake backend (local, free), then the real run if `IBM_QUANTUM_TOKEN` is set (same key as 8c). Estimated QPU use: well under a minute for 18 small circuits, but this is unverified, so check usage on the IBM dashboard afterwards.""")
-code("""from vqe_lab.hardware import run_curve
+First a **rehearsal** of the identical job on the fake backend (local, free), then the real run if `IBM_QUANTUM_TOKEN` is set (same key as 8c). **Qubit choice:** `run_curve` picks the coupled pair with the lowest two-qubit-gate + readout error from the backend's live calibration. An earlier version let the transpiler choose, and it put both runs on qubits [0, 1]. On ibm_kingston that pair gave 180–486 mHa raw errors and a readout calibration far off (negative mass ≈ −0.7). IBM's saved calibration snapshot for Kingston lists qubit 1 at 16.8% readout error, against a 0.95% median.
+
+Estimated QPU use: well under a minute for 18 small circuits, but this is unverified, so check usage on the IBM dashboard afterwards.""")
+code("""from vqe_lab.hardware import run_curve, best_qubit_pair, local_sampler
 from qiskit_ibm_runtime import SamplerV2
 from qiskit_ibm_runtime.fake_provider import FakeManilaV2
 
@@ -354,12 +356,12 @@ def plot_curve(out, title):
               f"  +symmetry {(E[d]['symmetry'] - E[d]['exact']) * 1e3:6.2f} mHa")
 
 fake_backend = FakeManilaV2()
-fake_curve = run_curve(SamplerV2(mode=fake_backend), fake_backend, CURVE_BONDS, shots=CURVE_SHOTS, seed=0)
+fake_curve = run_curve(local_sampler(fake_backend, seed=0), fake_backend, CURVE_BONDS, shots=CURVE_SHOTS, seed=0)
 plot_curve(fake_curve, "Rehearsal: H₂ curve on FakeManilaV2 (simulated)")""")
 code("""hardware_curve = None
 if token:
     backend = service.least_busy(operational=True, simulator=False)
-    print("submitting 18 circuits to", backend.name, "...")
+    print("submitting 18 circuits to", backend.name, "on qubits", best_qubit_pair(backend), "...")
     hardware_curve = run_curve(SamplerV2(mode=backend), backend, CURVE_BONDS, shots=CURVE_SHOTS, seed=0)
     hardware_curve["backend"] = backend.name
     print("job id:", hardware_curve["job_id"], "| physical qubits:", hardware_curve["physical_qubits"])

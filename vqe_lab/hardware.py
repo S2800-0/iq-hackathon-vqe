@@ -108,12 +108,37 @@ def analyze_curve(plan: dict, counts: list[dict]) -> dict:
     return out
 
 
-def run_curve(sampler, backend, bonds, shots: int = 4000, seed: int = 0) -> dict:
+def best_qubit_pair(backend) -> list[int]:
+    """Coupled pair with the lowest two-qubit gate error plus both readout errors.
+
+    Left to itself, the transpiler tends to place a 2-qubit circuit on qubits 0 and 1,
+    whatever their quality that day.
+    """
+    t = backend.target
+    g2 = next(g for g in ("cz", "ecr", "cx") if g in t.operation_names)
+
+    def err(props):
+        return props.error if props is not None and props.error is not None else 1.0
+
+    best, best_score = None, float("inf")
+    for (a, b), props in t[g2].items():
+        score = err(props) + err(t["measure"].get((a,))) + err(t["measure"].get((b,)))
+        if score < best_score:
+            best, best_score = [a, b], score
+    return best
+
+
+def local_sampler(backend, seed: int = 0):
+    """Sampler for the fake-backend rehearsal, with the simulator seeded so reruns match."""
+    from qiskit_ibm_runtime import SamplerV2
+
+    return SamplerV2(mode=backend, options={"simulator": {"seed_simulator": seed}})
+
+
+def run_curve(sampler, backend, bonds, shots: int = 4000, seed: int = 0, physical=None) -> dict:
     """Transpile everything onto the same two physical qubits and submit one job."""
     plan = build_curve(bonds)
-    first = transpile(plan["circuits"][0], backend, optimization_level=1, seed_transpiler=seed)
-    layout = first.layout.initial_layout
-    physical = [layout[q] for q in plan["circuits"][0].qubits]
+    physical = list(physical or best_qubit_pair(backend))
     tcs = transpile(plan["circuits"], backend, initial_layout=physical,
                     optimization_level=1, seed_transpiler=seed)
     job = sampler.run(tcs, shots=shots)
