@@ -12,7 +12,7 @@ FIG = ROOT / "figures"
 FIG.mkdir(exist_ok=True)
 NAMES = ["02_dissociation", "03_ground_state_weights", "03_ansatz_error", "04a_optimizers", "04b_noisy_optimizers",
          "05_warm_start", "06_noise_mitigation", "07_error_budget", "08a_heh_plus", "08b_symmetry_filter",
-         "08b_falsification", "08d_rehearsal"]
+         "08b_falsification", "08d_rehearsal", "08d_recorded_best_pair"]
 saved = []
 
 
@@ -31,7 +31,7 @@ for cell in json.loads((ROOT / "notebooks" / "vqe_study.ipynb").read_text())["ce
 assert saved == NAMES, saved
 
 runs = json.loads((ROOT / "results" / "hardware_runs.json").read_text())
-fig, axes = plt.subplots(1, len(runs["curves"]), figsize=(11, 4))
+fig, axes = plt.subplots(1, len(runs["curves"]), figsize=(5.5 * len(runs["curves"]), 4))
 for ax, run in zip(axes, runs["curves"]):
     for mode, mk in [("raw", "x-"), ("readout", "s-"), ("symmetry", "o-")]:
         ax.plot(run["bonds"], run[mode], mk, label=mode)

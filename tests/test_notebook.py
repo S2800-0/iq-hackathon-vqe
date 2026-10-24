@@ -130,3 +130,10 @@ def test_single_point_hardware_cell_uses_best_qubit_pair():
     cells = ["".join(c["source"]) for c in json.loads(NB.read_text())["cells"] if c["cell_type"] == "code"]
     cell = next(c for c in cells if "RuntimeEstimator(mode=backend" in c)
     assert "initial_layout=best_qubit_pair(backend)" in cell
+
+
+def test_recorded_best_pair_curve_in_summary(ns):
+    rec = ns["recorded_curve"]
+    assert rec["physical_qubits"] == [148, 149]
+    names = {r["quantity"] for r in ns["summary"]}
+    assert "Real hardware curve, max |readout error| (ibm_kingston best pair, recorded)" in names
