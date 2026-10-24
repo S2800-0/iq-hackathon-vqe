@@ -5,7 +5,7 @@
 | | |
 |---|---|
 | **Group name** | bitteam |
-| **Member** | Shahesta _TODO last name_ |
+| **Member** | Shahesta |
 | **Affiliation** | Al Ryada University |
 | **Department** | Computer Science and Artificial Intelligence |
 | **Career level** | Undergraduate student |
